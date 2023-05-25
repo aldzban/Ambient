@@ -53,13 +53,13 @@ tokio = { workspace = true }
 winit = { workspace = true }
 wgpu = { workspace = true }
 ulid = { workspace = true }
+wit-component = { workspace = true }
 
 [target.'cfg(not(target_os = "unknown"))'.dependencies]
 wasmtime = { workspace = true }
 wasmtime-wasi = { workspace = true }
 wasi-common = { workspace = true }
 wasi-cap-std-sync = { workspace = true }
-wit-component = { workspace = true }
 ambient_physics = { path = "../physics" }
 physxx = { path = "../../libs/physxx" }
 
