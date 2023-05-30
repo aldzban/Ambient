@@ -48,16 +48,14 @@ pub async fn build(
     path: PathBuf,
     manifest: &ProjectManifest,
     optimize: bool,
-) -> Metadata {
-    log::info!(
-        "Building project `{}` ({})",
-        manifest.project.id,
-        manifest
-            .project
-            .name
-            .as_deref()
-            .unwrap_or_else(|| manifest.project.id.as_ref())
-    );
+) -> anyhow::Result<Metadata> {
+    let name = manifest
+        .project
+        .name
+        .as_deref()
+        .unwrap_or_else(|| manifest.project.id.as_ref());
+
+    tracing::info!("Building project `{}` ({})", manifest.project.id, name);
 
     ambient_ecs::ComponentRegistry::get_mut()
         .add_external(ambient_project_native::all_defined_components(manifest, false).unwrap());
@@ -66,15 +64,21 @@ pub async fn build(
     let assets_path = path.join("assets");
 
     std::fs::create_dir_all(&build_path).unwrap();
-    build_assets(physics, &assets_path, &build_path).await;
+    build_assets(physics, &assets_path, &build_path).await?;
+
     build_rust_if_available(&path, manifest, &build_path, optimize)
         .await
-        .unwrap();
-    store_manifest(manifest, &build_path).await.unwrap();
-    store_metadata(&build_path).await.unwrap()
+        .with_context(|| format!("Failed to build rust {build_path:?}"))?;
+
+    store_manifest(manifest, &build_path).await?;
+    store_metadata(&build_path).await
 }
 
-async fn build_assets(physics: Physics, assets_path: &Path, build_path: &Path) {
+async fn build_assets(
+    physics: Physics,
+    assets_path: &Path,
+    build_path: &Path,
+) -> anyhow::Result<()> {
     let files = WalkDir::new(assets_path)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -111,8 +115,14 @@ async fn build_assets(physics: Physics, assets_path: &Path, build_path: &Path) {
             async {}.boxed()
         }),
     };
+
     ProcessCtxKey.insert(&ctx.assets, ctx.clone());
-    pipelines::process_pipelines(&ctx).await;
+
+    pipelines::process_pipelines(&ctx)
+        .await
+        .with_context(|| format!("Failed to proccess pipelines for {assets_path:?}"))?;
+
+    Ok(())
 }
 
 async fn build_rust_if_available(

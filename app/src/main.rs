@@ -230,16 +230,19 @@ fn main() -> anyhow::Result<()> {
         if !cli.project().unwrap().no_build && project_path.is_local() {
             let project_name = manifest.project.name.as_deref().unwrap_or("project");
             log::info!("Building {}", project_name);
-            let metadata = runtime.block_on(ambient_build::build(
-                PhysicsKey.get(&assets),
-                &assets,
-                project_path
-                    .fs_path
-                    .clone()
-                    .expect("should be present as it's already checked above"),
-                manifest,
-                cli.project().map(|p| p.release).unwrap_or(false),
-            ));
+            let metadata = runtime
+                .block_on(ambient_build::build(
+                    PhysicsKey.get(&assets),
+                    &assets,
+                    project_path
+                        .fs_path
+                        .clone()
+                        .expect("should be present as it's already checked above"),
+                    manifest,
+                    cli.project().map(|p| p.release).unwrap_or(false),
+                ))
+                .context("Failed to build project")?;
+
             log::info!("Done building {}", project_name);
             Some(metadata)
         } else {

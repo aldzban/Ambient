@@ -135,7 +135,12 @@ impl AbsAssetUrl {
     }
 
     pub fn file_stem(&self) -> Option<&str> {
-        let last = self.0.path().rsplit('/').next().expect("There should be at least one element");
+        let last = self
+            .0
+            .path()
+            .rsplit('/')
+            .next()
+            .expect("There should be at least one element");
         if last.is_empty() {
             None
         } else {
@@ -255,7 +260,9 @@ impl AbsAssetUrl {
             let content: Vec<u8> = ambient_sys::fs::read(path)
                 .await
                 .context(format!("Failed to read file at: {:}", self.0))?;
-            Ok(serde_json::from_slice(&content)?)
+            let de = &mut serde_json::de::Deserializer::from_slice(&content);
+            let res = serde_path_to_error::deserialize(de)?;
+            Ok(res)
         } else {
             Ok(
                 download(assets, self.to_download_raw_url(assets)?, |resp| async {
@@ -323,7 +330,12 @@ fn test_abs_asset_url() {
         "http://t.c/hello"
     );
 
-    assert_eq!(AbsAssetUrl::parse("http://t.c/a/b/c.png").unwrap().last_dir_name(), Some("b"));
+    assert_eq!(
+        AbsAssetUrl::parse("http://t.c/a/b/c.png")
+            .unwrap()
+            .last_dir_name(),
+        Some("b")
+    );
     assert_eq!(
         AbsAssetUrl::parse("http://t.c/a/b/c.png")
             .unwrap()
@@ -331,9 +343,24 @@ fn test_abs_asset_url() {
         Some("b")
     );
 
-    assert_eq!(AbsAssetUrl::parse("http://t.c/a/").unwrap().file_stem(), None);
-    assert_eq!(AbsAssetUrl::parse("http://t.c/a/b").unwrap().file_stem().as_deref(), Some("b"));
-    assert_eq!(AbsAssetUrl::parse("http://t.c/a/b/c.png").unwrap().file_stem().as_deref(), Some("c"));
+    assert_eq!(
+        AbsAssetUrl::parse("http://t.c/a/").unwrap().file_stem(),
+        None
+    );
+    assert_eq!(
+        AbsAssetUrl::parse("http://t.c/a/b")
+            .unwrap()
+            .file_stem()
+            .as_deref(),
+        Some("b")
+    );
+    assert_eq!(
+        AbsAssetUrl::parse("http://t.c/a/b/c.png")
+            .unwrap()
+            .file_stem()
+            .as_deref(),
+        Some("c")
+    );
 }
 
 #[test]
