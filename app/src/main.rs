@@ -173,7 +173,6 @@ impl TryFrom<Option<String>> for ProjectPath {
 
 fn main() -> anyhow::Result<()> {
     setup_logging()?;
-    tracing::debug!("Local ip {:?}", local_ip_address::local_ip());
 
     shared::components::init()?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -317,7 +316,7 @@ fn main() -> anyhow::Result<()> {
             }
         };
 
-        let port = server::start(
+        let addr = server::start(
             &runtime,
             assets.clone(),
             cli.clone(),
@@ -326,7 +325,7 @@ fn main() -> anyhow::Result<()> {
             metadata.as_ref().expect("no build metadata"),
             crypto,
         );
-        ResolvedAddr::localhost_with_port(port)
+        ResolvedAddr::localhost_with_port(addr.port())
     } else {
         unreachable!()
     };
