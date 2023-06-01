@@ -64,7 +64,6 @@ env_logger = { workspace = true }
 futures = { workspace = true }
 flume = { workspace = true }
 glam = { workspace = true }
-local-ip-address = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
