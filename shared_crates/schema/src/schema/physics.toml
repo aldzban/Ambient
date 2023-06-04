@@ -159,3 +159,9 @@ type = "Empty"
 name = "Visualize collider"
 description = "If attached, the collider will be rendered."
 attributes = ["Debuggable", "Networked"]
+
+[components."core::physics::center_of_mass"]
+type = "Vec3"
+name = "Center of mass"
+description = "The center of mass of a physics object"
+attributes = ["Debuggable", "Networked", "Store"]
