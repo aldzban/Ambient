@@ -18,6 +18,8 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
+pub mod packages;
+
 #[element_component(without_el)]
 fn UnitAnimation(
     _hooks: &mut Hooks,
@@ -150,6 +152,7 @@ pub fn main() {
         move |v| {
             let mut anims = anims.lock().unwrap();
             for (id, target) in v {
+                let target = if target.is_null() { id } else { target };
                 let tree = UnitAnimation::from_entity(id).el().spawn_tree();
                 entity::add_component(
                     target,

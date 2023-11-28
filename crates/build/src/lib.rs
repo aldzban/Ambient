@@ -20,10 +20,13 @@ use anyhow::Context;
 use futures::FutureExt;
 use itertools::Itertools;
 use pipelines::{out_asset::OutAsset, FileCollection, ProcessCtx, ProcessCtxKey};
+use tokio::sync::Semaphore;
 use walkdir::WalkDir;
 
 pub mod migrate;
 pub mod pipelines;
+
+mod package_json;
 
 #[derive(Clone, Debug)]
 pub struct BuildResult {
@@ -31,6 +34,12 @@ pub struct BuildResult {
     pub package_name: String,
     pub was_built: bool,
 }
+
+// Settings to disable build steps for faster iteration
+/// If false, always build packages, even if they are unchanged
+const SKIP_BUILD_IF_UNCHANGED: bool = true;
+/// If false, asset building (code, assets) will be skipped
+const BUILD_ASSETS: bool = true;
 
 /// This takes the path to a single Ambient package and builds it.
 /// It assumes all of its dependencies are already built.
@@ -47,6 +56,7 @@ pub async fn build_package(
     package_path: &Path,
     root_build_path: &Path,
 ) -> anyhow::Result<BuildResult> {
+    let _span = tracing::info_span!("register_semantic", ?package_path).entered();
     let mut semantic = Semantic::new(settings.deploy).await?;
 
     let package_item_id = add_to_semantic_and_register_components(
@@ -72,7 +82,18 @@ pub async fn build_package(
                 .to_owned(),
         )
     };
+
+    drop(_span);
+
+    let package_id = manifest
+        .package
+        .id
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or("missing ID");
     let package_name = &manifest.package.name;
+    let _span =
+        tracing::info_span!("build_package", name = package_name, id = package_id).entered();
 
     // Bodge: for local builds, rewrite the dependencies to be relative to this package,
     // assuming that they are all in the same folder
@@ -164,42 +185,57 @@ pub async fn build_package(
         .zip(last_modified_time)
         .is_some_and(|(build, modified)| modified < build);
 
-    let package_id = manifest
-        .package
-        .id
-        .as_ref()
-        .map(|s| s.as_str())
-        .unwrap_or("missing ID");
-
-    if last_build_settings.as_ref() == Some(settings) && last_modified_before_build {
-        tracing::info!("Skipping unmodified package \"{package_name}\" ({package_id})");
-        return Ok(BuildResult {
-            build_path,
-            package_name: package_name.clone(),
-            was_built: false,
-        });
+    if SKIP_BUILD_IF_UNCHANGED {
+        if last_build_settings.as_ref() == Some(settings) && last_modified_before_build {
+            tracing::info!("Skipping unmodified package");
+            return Ok(BuildResult {
+                build_path,
+                package_name: package_name.clone(),
+                was_built: false,
+            });
+        }
     }
 
-    tracing::info!("Building package \"{package_name}\" ({package_id})");
+    tracing::info!("Building package");
 
-    let assets_path = package_path.join("assets");
-    tokio::fs::create_dir_all(&build_path)
-        .await
-        .context("Failed to create build directory")?;
+    if BUILD_ASSETS {
+        let assets_path = package_path.join("assets");
+        tokio::fs::create_dir_all(&build_path)
+            .await
+            .context("Failed to create build directory")?;
 
-    let assets = if !settings.wasm_only {
-        build_assets(assets, &assets_path, &build_path, false).await?
-    } else {
-        vec![]
-    };
+        let assets = if !settings.wasm_only {
+            build_assets(assets, &assets_path, &build_path, false).await?
+        } else {
+            vec![]
+        };
 
-    build_rust_if_available(&package_path, &manifest, &build_path, settings.release)
-        .await
-        .with_context(|| format!("Failed to build Rust in {build_path:?}"))?;
+        tracing::info!("Assets built, building source code...");
 
-    tokio::fs::write(&output_manifest_path, toml::to_string(&manifest)?).await?;
+        build_rust_if_available(&package_path, &manifest, &build_path, settings.release)
+            .await
+            .with_context(|| format!("Failed to build Rust in {build_path:?}"))?;
 
-    store_metadata(&package_path, &build_path, settings, &assets).await?;
+        tracing::info!("Source built");
+
+        tokio::fs::write(&output_manifest_path, toml::to_string(&manifest)?).await?;
+
+        write_metadata(&package_path, &build_path, settings, &assets).await?;
+    }
+
+    // Deploy implies docs are always built, as they are required for deployment
+    let build_docs = settings.build_docs || settings.deploy;
+    if build_docs {
+        tracing::info!("Building docs...");
+
+        let json_path = package_json::write(&build_path, &semantic, package_item_id)?;
+        let docs_path = build_path.join("docs");
+        std::fs::remove_dir_all(&docs_path).ok();
+        std::fs::create_dir_all(&docs_path)?;
+        ambient_package_docgen::write(&docs_path, &json_path, false)?;
+
+        tracing::info!("Docs built");
+    }
 
     Ok(BuildResult {
         build_path,
@@ -240,6 +276,8 @@ pub async fn build_assets(
     let anim_files = Arc::new(parking_lot::Mutex::new(vec![]));
     let anim_files_clone = anim_files.clone();
 
+    let file_write_semaphore = Arc::new(Semaphore::new(10));
+
     let ctx = ProcessCtx {
         assets: assets.clone(),
         files: FileCollection(Arc::new(files)),
@@ -249,8 +287,11 @@ pub async fn build_assets(
         package_name: "".to_string(),
         write_file: Arc::new({
             let build_path = build_path.to_owned();
+            let file_write_semaphore = file_write_semaphore.clone();
             move |path, contents| {
+                let file_write_semaphore = file_write_semaphore.clone();
                 let path = build_path.join("assets").join(path);
+                tracing::trace!("Writing file: {:?}", path);
 
                 if for_import_only {
                     if let Some(ext) = path.extension() {
@@ -266,6 +307,7 @@ pub async fn build_assets(
 
                 async move {
                     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                    let _permit = file_write_semaphore.acquire().await.unwrap();
                     tokio::fs::write(&path, contents).await.unwrap();
                     AbsAssetUrl::from_file_path(path)
                 }
@@ -273,13 +315,13 @@ pub async fn build_assets(
             }
         }),
         on_status: Arc::new(|msg| {
-            log::debug!("{}", msg);
+            tracing::debug!("{}", msg);
             async {}.boxed()
         }),
         on_error: Arc::new({
             let has_errored = has_errored.clone();
             move |err| {
-                log::error!("{:?}", err);
+                tracing::error!("{:?}", err);
                 has_errored.store(true, Ordering::SeqCst);
                 async {}.boxed()
             }
@@ -357,7 +399,7 @@ fn get_component_paths(target: &str, build_path: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
-async fn store_metadata(
+async fn write_metadata(
     package_path: &Path,
     build_path: &Path,
     settings: &BuildSettings,

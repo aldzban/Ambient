@@ -97,7 +97,7 @@ macro_rules! log_result {
 macro_rules! log_warning {
     ( $x:expr ) => {
         if let Err(err) = $x {
-            log::warn!("{:?}", err);
+            tracing::warn!("{:?}", err);
         }
     };
 }
@@ -121,7 +121,7 @@ macro_rules! unwrap_log_warn {
         match $x {
             Ok(val) => val,
             Err(err) => {
-                log::warn!("{:?}", err);
+                tracing::warn!("{:?}", err);
                 return Default::default();
             }
         }
@@ -149,13 +149,20 @@ pub struct AmbientVersion {
 }
 
 impl AmbientVersion {
-    /// Returns git tag for this version, if any. Currently only available for releases and nightly builds.
+    /// Returns git tag for this version, if any. Currently only available for releases, nightly and internal builds.
     pub fn tag(&self) -> Option<String> {
         if !self.version.build.is_empty() {
             return None;
         }
-        (self.version.pre.is_empty() || self.version.pre.starts_with("nightly-"))
-            .then(|| format!("v{}", self.version))
+        (self.version.pre.is_empty()
+            || self.version.pre.starts_with("nightly-")
+            || self.version.pre.starts_with("internal-"))
+        .then(|| format!("v{}", self.version))
+    }
+
+    /// True if this is a full released version (that is there's a tag, uploaded build and api is released to crates.io).
+    pub fn is_released_version(&self) -> bool {
+        self.version.pre.is_empty() && self.version.build.is_empty()
     }
 }
 
@@ -163,7 +170,7 @@ impl Default for AmbientVersion {
     fn default() -> Self {
         Self {
             version: Version::parse(RUNTIME_VERSION).expect("Failed to parse version"),
-            revision: ambient_git_rev::REV_FULL.to_string(),
+            revision: ambient_git_rev::get(),
         }
     }
 }

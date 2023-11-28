@@ -134,7 +134,7 @@ To do so, you will need to update the following files:
 ### Core definitions
 
 - `crates/wasm/wit/component.wit`: Add the new type to the three `value` enums.
-- `shared_crates/shared_types/src/lib.rs`: Add the new type to the `primitive_component_definitions` definition.
+- `shared_crates/primitive_component_definitions/src/lib.rs`: Add the new type to the `primitive_component_definitions` definition.
 
 ### Code generation
 
@@ -157,6 +157,7 @@ To do so, you will need to update the following files:
 
 - `CHANGELOG.md`: Document the addition of the new supported type.
 - `docs/src/reference/package.md`: Document the new type in the components section.
+- `crates/build/src/package_json.rs`: Specify how to convert the type to JSON.
 
 ## Golden image tests
 
@@ -200,3 +201,4 @@ There are known situations where a test might fail seemingly randomly, even if t
 8. Make a commit with the above changes, and create a tag `v0.X.Y`.
 9. Push to origin.
 10. If this is a new major release (e.g. `0.2.0`), immediately update the version using `cargo campfire release update-version` to the next major release suffixed by dev (e.g. `0.3.0-dev`) and push that up (but do not tag it). This is to disambiguate in-development major releases from stable ones. If we need to update the released version, we will branch off from the release, cherry-pick relevant hotfixes, and cut a new release from that branch.
+11. Update the tutorial and [tutorial project](https://github.com/AmbientRun/TutorialProject) with the latest deployments. Ensure the version of the repository used for the website is updated, too.

@@ -22,6 +22,8 @@ pub(crate) enum Profile {
 pub struct BuildOptions {
     #[arg(long, default_value = "dev")]
     pub(crate) profile: Profile,
+    #[arg(long, default_value = "")]
+    pub(crate) features: String,
     #[arg(long, default_value = "pkg")]
     pub pkg_name: String,
     #[arg(long, value_enum, default_value = "bundler")]
@@ -48,6 +50,10 @@ impl BuildOptions {
                 command.args(["--profile=profiling"]);
             }
         };
+
+        if !self.features.is_empty() {
+            command.args(["--features", &self.features]);
+        }
 
         let res = command.spawn()?.wait().await?;
 
@@ -89,7 +95,11 @@ impl BuildOptions {
 
         command.arg("--out-dir").arg(output_path.clone());
 
-        eprintln!("Building web client {command:?}");
+        if !self.features.is_empty() {
+            command.args(["--features", &self.features]);
+        }
+
+        tracing::info!("Building web client {command:?}");
 
         let res = command.spawn()?.wait().await?;
 
@@ -99,14 +109,14 @@ impl BuildOptions {
 
         assert!(output_path.exists());
 
-        eprintln!("Built package: {:?}", output_path);
+        tracing::info!("Built package: {:?}", output_path);
 
         Ok(output_path)
     }
 }
 #[cfg(not(target_os = "linux"))]
 pub(crate) async fn install_wasm_pack() -> anyhow::Result<()> {
-    eprintln!("Installing wasm-pack from source");
+    tracing::info!("Installing wasm-pack from source");
     let status = Command::new("cargo")
         .args(["install", "wasm-pack"])
         .kill_on_drop(true)
@@ -123,7 +133,8 @@ pub(crate) async fn install_wasm_pack() -> anyhow::Result<()> {
 
 #[cfg(target_os = "linux")]
 pub(crate) async fn install_wasm_pack() -> anyhow::Result<()> {
-    eprintln!("Installing wasm-pack");
+    tracing::info!("Installing wasm-pack");
+
     let mut curl = std::process::Command::new("curl")
         .args([
             "https://rustwasm.github.io/wasm-pack/installer/init.sh",
@@ -163,7 +174,7 @@ pub async fn ensure_wasm_pack() -> anyhow::Result<()> {
             Ok(())
         }
         Ok(path) => {
-            eprintln!("Found installation of wasm-pack at {path:?}");
+            tracing::info!("Found installation of wasm-pack at {path:?}");
             Ok(())
         }
     }

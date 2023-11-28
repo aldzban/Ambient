@@ -16,7 +16,23 @@ Package "my-project" deployed successfully!
 
 This will package and upload your creation to the platform. The web URL in the output can be used to browse your game or asset. If you're on a WebGPU enabled browser, the game can be played directly on the website. Any content upload to the Ambient platform is subject to our [terms of services](https://www.ambient.run/terms-of-service).
 
+If a `screenshot.png` is present in the package's directory, it will be used as the game's thumbnail on the Ambient website. We recommend you include one.
+
 In the case your package is a game, it can be played directly on the website (if you're on a WebGPU enabled browser). Additionally, game servers will automatically be spun up when someone wants to play your game.
+
+## Putting your game on itch.io
+
+To put your game on itch.io, you just need to deploy it to ambient.run first, and then upload the html app for your game which you can download from your games page on ambient.run. Here are the detailed steps:
+
+1. Run `ambient deploy` to deploy your game to ambient.run (see above for details)
+2. Go to your game page on https://ambient.run, i.e. something like https://ambient.run/packages/uigiqyr7qugdncpzkyzinvwxh26daahx
+3. Download the itch html app (in the sidebar to the left)
+4. Go to http://itch.io and create a new project (arrow next to your profile -> upload new project)
+5. Change the "Kind of project" to "HTML"
+6. Click "Upload files" and pick the `.html` file you just downloaded from ambient.run
+7. Click "This file will be played in the browser"
+8. Fille out any other information you'd like, then hit "Save"
+9. Done! Your game should now be playable from itch.io
 
 ## Self-hosted
 

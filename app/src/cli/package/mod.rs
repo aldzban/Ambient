@@ -61,6 +61,10 @@ pub struct PackageArgs {
     #[arg(long)]
     /// Only build the WASM modules
     pub build_wasm_only: bool,
+
+    #[arg(long)]
+    /// Open docs after building
+    pub open_docs: bool,
 }
 impl PackageArgs {
     pub fn is_release(&self) -> Option<bool> {
@@ -84,15 +88,22 @@ impl PackageArgs {
 pub struct HostCli {
     #[arg(long, default_value = "0.0.0.0")]
     pub bind_address: IpAddr,
+
     /// Provide a public address or IP to the instance, which will allow users to connect to this instance over the internet
     ///
     /// Defaults to localhost
     #[arg(long)]
     pub public_host: Option<String>,
 
-    /// Defaults to 8889
+    /// Defaults to 8999
     #[arg(long)]
     pub http_interface_port: Option<u16>,
+
+    /// Use HTTPS for http interface (content serving, ping, ...)
+    ///
+    /// Defaults to not using HTTPS
+    #[arg(long, requires("cert"))]
+    pub use_https: bool,
 
     /// Defaults to 9000
     #[arg(long)]

@@ -2,12 +2,12 @@
 id = "per6j2iqhj3jz4da3fqr75jcj2kqjooo"
 name = "Nameplates"
 description = "Basic 3D nameplates for players."
-version = "0.3.1-dev"
+version = "0.3.2-nightly-2023-11-27"
 content = { type = "Asset", code = true }
-ambient_version = "0.3.1-dev"
+ambient_version = "0.3.2-nightly-2023-11-27"
 
 [dependencies]
-game_object = { path = "../../schemas/game_object", deployment = "1dyIvQx50CG6vvLfa8xCqa" }
+game_object = { path = "../../schemas/game_object", deployment = "36xUYdd9Svl4bemFEF64Lv" }
 
 [components]
 height_offset = { type = "F32", name = "Nameplate Height Offset", description = "The height offset from the base of this entity at which to render a nameplate. If not specified, it will default to this entity's local bounding AABB Z, and if that's not available, it will default to a constant.", attributes = [
@@ -17,4 +17,8 @@ height_offset = { type = "F32", name = "Nameplate Height Offset", description = 
 text_size = { type = "F32", name = "Nameplate Text Size", description = "The text size of the nameplate to render. If not specified, it will default to 2.0.", attributes = [
     "Debuggable",
     "Networked",
+] }
+hide = { type = "Empty", name = "Nameplate Hide", description = "If attached to a player, hide the nameplate for that player.", attributes = [
+    "Networked",
+    "Debuggable",
 ] }

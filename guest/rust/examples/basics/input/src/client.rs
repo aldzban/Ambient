@@ -1,11 +1,10 @@
-use ambient_api::{core::messages::Frame, input::is_game_focused, prelude::*};
+use ambient_api::{core::messages::Frame, prelude::*};
+
+pub mod packages;
 
 #[main]
 pub fn main() {
     Frame::subscribe(move |_| {
-        if !is_game_focused() {
-            return;
-        }
         let (delta, _input) = input::get_delta();
 
         if !delta.keys.is_empty() {
